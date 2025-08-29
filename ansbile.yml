@@ -21,19 +21,19 @@
 
     - name: Create directory for Yubikey key values
       ansible.builtin.file:
-        path: /home/ <user> /.config/Yubico
+        path: /home/ <your user> /.config/Yubico
         state: directory
-        owner: <user>
-        group: <group>
+        owner: <your user>
+        group: <your group>
 
     - name: Store Yubikey values
       ansible.builtin.copy:
-        dest: /home/ <user> /.config/Yubico/u2f_keys
-        owner: user
-        group: user
+        dest: /home/ <your user> /.config/Yubico/u2f_keys
+        owner: <your user>
+        group: <your group>
         mode: '0644'
         content: 
-          <user>:<data> Store here the file with the Yubikey key values!
+          <your user>:<your u2f data>
 
     - name: Store u2f_required pam config for demanding a yubikey for authentication
       ansible.builtin.copy:
@@ -164,9 +164,9 @@
         state: restarted
       when: result.changed is true
 
-    - name: Set hostname to <whatever>
+    - name: Set hostname to <whatever you want>
       ansible.builtin.hostname:
-        name: <whatever>
+        name: <whatever you want>
 
     - name: Prevent user list in gdm
       ansible.builtin.copy:
