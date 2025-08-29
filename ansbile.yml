@@ -195,3 +195,11 @@
       ansible.builtin.shell: |
         dconf update
       when: result1.changed is true or result2.changed is true
+      
+    - name: Set UMASK in /etc/login.defs on 027, it was 022.
+      ansible.builtin.lineinfile:
+        path: /etc/login.defs
+        regexp: '^UMASK\s+'
+        line: 'UMASK 027'
+        state: present
+        backup: no
