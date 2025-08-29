@@ -16,4 +16,5 @@ Steps in the job:
 - Store and activate a safe chony.
 - Set the host name.
 - Prevent showing the user list when loging in with gdm. In my mind the userid is also secret. It cannot be masked during typing in.
+- Force umask 027 via /etc/profile.d/umask.sh
 - Here at house the list is longer with private stuff...
