@@ -196,10 +196,11 @@
         dconf update
       when: result1.changed is true or result2.changed is true
       
-    - name: Set UMASK in /etc/login.defs on 027, it was 022.
-      ansible.builtin.lineinfile:
-        path: /etc/login.defs
-        regexp: '^UMASK\s+'
-        line: 'UMASK 027'
-        state: present
-        backup: no
+    - name: Force umask 027 via /etc/profile.d/umask.sh
+      ansible.builtin.copy:
+        dest: /etc/profile.d/umask.sh
+        content: |
+          umask 027
+        owner: root
+        group: root
+        mode: '0644'
