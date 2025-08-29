@@ -1,0 +1,197 @@
+---
+- name: Hardening localhost fedora 42
+  hosts: localhost
+  tasks:
+    - name: Retrieve authselect current settings
+      ansible.builtin.shell: |
+        authselect current
+      register: result
+      changed_when: false
+
+    - name: If needed activate needed authselect profile local with silent-lastlog
+      ansible.builtin.shell: |
+        authselect select local with-silent-lastlog
+      when: ('local' not in result.stdout_lines[0]) or ('silent-lastlog' not in result.stdout_lines[2]) or (result.stdout_lines | length != 3)
+
+    - name: Install u2f software
+      ansible.builtin.dnf:
+        name: 
+          - pam-u2f
+          - pamu2fcfg
+
+    - name: Create directory for Yubikey key values
+      ansible.builtin.file:
+        path: /home/ <user> /.config/Yubico
+        state: directory
+        owner: <user>
+        group: <group>
+
+    - name: Store Yubikey values
+      ansible.builtin.copy:
+        dest: /home/ <user> /.config/Yubico/u2f_keys
+        owner: user
+        group: user
+        mode: '0644'
+        content: 
+          <user>:<data> Store here the file with the Yubikey key values!
+
+    - name: Store u2f_required pam config for demanding a yubikey for authentication
+      ansible.builtin.copy:
+        dest: /etc/pam.d/u2f-required
+        owner: root
+        group: root
+        mode: '0644'
+        content: |
+          #%PAM-1.0
+          auth required pam_u2f.so cue
+
+    - name: Store polkit-1 with u2f_required for demanding a yubikey when unlocking for priviledged functions
+      ansible.builtin.copy:
+        dest: /etc/pam.d/polkit-1
+        owner: root
+        group: root
+        mode: '0644'
+        content: |
+          #%PAM-1.0
+          auth include u2f-required
+          auth       include      system-auth
+          account    include      system-auth
+          password   include      system-auth
+          session    include      system-auth
+
+    - name: Add u2f-required in sudo
+      ansible.builtin.lineinfile:
+        path: /etc/pam.d/sudo
+        regexp: "^auth include u2f-required"
+        insertafter: "#%PAM-1.0"
+        line: "auth include u2f-required"
+
+    - name: Disable unneeded services
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        state: stopped
+        enabled: false
+        masked: true
+      loop:
+        - abrtd.service
+        - abrt-journal-core.service
+        - abrt-oops.service
+        - abrt-vmcore.service
+        - abrt-xorg.service
+        - avahi-daemon.service
+        - avahi-daemon.socket
+        - bolt.service
+        - colord.service
+        - cups.service
+        - cups.socket
+        - cups.path
+        - geoclue.service
+        - iscsi.service
+        - iscsid.service
+        - iscsiuio.service
+        - iscsi-starter.service
+        - iscsi-onboot.service
+        - iscsi-init.service
+        - iscsi-shutdown.service
+        - iscsid.socket
+        - iscsiuio.socket
+        - ModemManager.service
+        - pcscd.service
+        - realmd.service
+        - smartd.service
+        - sssd-kcm.service
+        - uresourced.service
+
+    - name: Remove unneeded /etc/pam.d files
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/pam.d/anaconda
+        - /etc/pam.d/gdm-autologin
+
+    - name: Store NetworkManager trackablity reduction config
+      ansible.builtin.copy:
+        dest: /etc/NetworkManager/conf.d/00-macrandomize.conf
+        owner: root
+        group: root
+        mode: '0644'
+        content: |
+          [device]
+          wifi.scan-rand-mac-address=yes
+
+          [connection]
+          wifi.cloned-mac-address=random
+          ethernet.cloned-mac-address=random
+        register: result
+
+    - name: Restart NetworkManager when config changed
+      ansible.builtin.service:
+        name: NetworkManager
+        state: restarted
+      when: result.changed is true
+
+    - name: Store safe chrony config
+      ansible.builtin.copy:
+        dest: /etc/chrony.conf
+        owner: root
+        group: root
+        mode: '0644'
+        content: |
+          server time.cloudflare.com iburst nts
+          server ntppool1.time.nl iburst nts
+          server nts.netnod.se iburst nts
+          server ptbtime1.ptb.de iburst nts
+          server time.dfm.dk iburst nts
+          server time.cifelli.xyz iburst nts
+          minsources 3
+          authselectmode require
+          dscp 46
+          driftfile /var/lib/chrony/drift
+          dumpdir /var/lib/chrony
+          ntsdumpdir /var/lib/chrony
+          leapseclist /usr/share/zoneinfo/leap-seconds.list
+          makestep 1.0 3
+          rtconutc
+          rtcsync
+          cmdport 0
+          noclientlog
+      register: result
+
+    - name: Restart chronyd when config changed
+      ansible.builtin.service:
+        name: chronyd
+        state: restarted
+      when: result.changed is true
+
+    - name: Set hostname to <whatever>
+      ansible.builtin.hostname:
+        name: <whatever>
+
+    - name: Prevent user list in gdm
+      ansible.builtin.copy:
+        dest: /etc/dconf/profile/gdm
+        owner: root
+        group: root
+        mode: '0644'
+        content: |
+          user-db:user
+          system-db:gdm
+          file-db:/usr/share/gdm/greeter-dconf-defaults
+        register: result1
+
+    - name: Prevent user list in gdm
+      ansible.builtin.copy:
+        dest: /etc/dconf/db/gdm.d/00-login-screen
+        owner: root
+        group: root
+        mode: '0644'
+        content: |
+          [org/gnome/login-screen]
+          disable-user-list=true
+      register: result2
+
+    - name: Update dconf using shell when config changed
+      ansible.builtin.shell: |
+        dconf update
+      when: result1.changed is true or result2.changed is true
