@@ -78,11 +78,15 @@
         selevel: s0
         content: |
           polkit.addRule(function(action, subject) {
-            if ((action.id == "org.freedesktop.Flatpak.app-install" || 
-              action.id == "org.freedesktop.Flatpak.app-uninstall" || 
-              action.id == "org.freedesktop.Flatpak.runtime-install" || 
-              action.id == "org.freedesktop.Flatpak.runtime-uninstall") && subject.isInGroup("user")) {
+            if (action.id.indexOf("org.freedesktop.Flatpak") != -1) {
+              if ((action.id.indexOf("install") != -1) && subject.isInGroup("user")) {
                 return polkit.Result.AUTH_ADMIN_KEEP;
+              }
+            }
+            if (action.id.indexOf("org.freedesktop.packagekit") != -1) {
+              if (((action.id.indexOf("install") != -1) || (action.id.indexOf("downgrade") != -1) || (action.id.indexOf("remove") != -1)) && subject.isInGroup("user")) {
+                return polkit.Result.AUTH_ADMIN_KEEP;
+              }
             }
           });
       register: result
