@@ -66,6 +66,34 @@
         insertafter: "#%PAM-1.0"
         line: "auth include u2f-required"
 
+    - name: Store 60-yubikey-Flatpak.rules
+      ansible.builtin.copy:
+        dest: /etc/polkit-1/rules.d/60-yubikey-Flatpak.rules
+        owner: root
+        group: root
+        mode: '0644'
+        seuser: system_u
+        setype: etc_t
+        serole: object_r
+        selevel: s0
+        content: |
+          polkit.addRule(function(action, subject) {
+            if ((action.id == "org.freedesktop.Flatpak.app-install" || 
+              action.id == "org.freedesktop.Flatpak.app-uninstall" || 
+              action.id == "org.freedesktop.Flatpak.runtime-install" || 
+              action.id == "org.freedesktop.Flatpak.runtime-uninstall") && subject.isInGroup("user")) {
+                return polkit.Result.AUTH_ADMIN_KEEP;
+            }
+          });
+      register: result
+
+    - name: Reload systemd and restart polkit
+      ansible.builtin.systemd:
+        name: polkit
+        state: restarted
+        daemon_reload: true
+      when: result.changed
+
     - name: Disable unneeded services
       ansible.builtin.systemd:
         name: "{{ item }}"
